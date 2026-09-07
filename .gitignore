@@ -1,0 +1,11 @@
+# Secrets — the Canvas session cookie is a live credential. Never commit.
+.env
+.env.local
+*.env
+
+node_modules/
+build/
+
+npm-debug.log*
+*.tsbuildinfo
+.DS_Store

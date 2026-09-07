@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "canvas": {
+      "command": "node",
+      "args": ["--env-file-if-exists=.env", "./build/src/index.js"]
+    }
+  }
+}
