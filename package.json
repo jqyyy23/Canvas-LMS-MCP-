@@ -10,8 +10,8 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "smoke": "npm run build && node --env-file=.env build/scripts/smoke.js",
-    "inspect": "npm run build && npx @modelcontextprotocol/inspector node --env-file=.env ./build/src/index.js"
+    "smoke": "npm run build && node --env-file-if-exists=.env build/scripts/smoke.js",
+    "inspect": "npm run build && npx @modelcontextprotocol/inspector node --env-file-if-exists=.env ./build/src/index.js"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
