@@ -37,6 +37,7 @@ Two consequences worth knowing:
 - **You will re-paste the cookie periodically** — roughly once a day, or once every two weeks if
   you also set `CANVAS_REMEMBER_COOKIE`. When it lapses, every tool returns step-by-step refresh
   instructions rather than an error, and deadline tools fall back to the calendar feed.
+- **The cookie's name is per-institution**, so it's configurable. See below.
 
 One caution: reading your own coursework is data you're already authorized to see, but automated
 access may still fall under your institution's acceptable-use policy. This server is built to be a
@@ -55,13 +56,27 @@ npm run build
 1. Log into Canvas in Chrome.
 2. Press `F12` and open the **Application** tab.
 3. **Storage → Cookies → your Canvas domain**.
-4. Copy the **Value** of `_normandy_session` into `CANVAS_SESSION_COOKIE` in `.env`.
+4. Copy the **Value** of `canvas_session` into `CANVAS_SESSION_COOKIE` in `.env`.
 
 The cookie is `httpOnly`, so `document.cookie` in the console will **not** show it. The Application
 tab is the only way to read it.
 
+**The cookie name varies by institution.** `canvas.ubc.ca` calls it `canvas_session`; upstream
+open-source Canvas ships `_normandy_session`; other installs rename it again. Whatever large
+`httpOnly` cookie your Canvas domain sets is the right one — set `CANVAS_SESSION_COOKIE_NAME` to
+match. This matters because Canvas silently ignores a cookie name it doesn't recognize, so a
+mismatch is indistinguishable from an expired session. `check_canvas_auth` prints the name in use.
+
 While you're there, also copy `pseudonym_credentials` into `CANVAS_REMEMBER_COOKIE` if it exists —
 it only appears if you ticked "Stay signed in", and it stretches the refresh interval to ~2 weeks.
+If it isn't there, log out and back in with that box checked.
+
+### If your Canvas is behind Cloudflare
+
+Some institutions (UBC included) front Canvas with Cloudflare. If you get 403s that aren't rate
+limits, copy the `cf_clearance` cookie into `CANVAS_EXTRA_COOKIES` as
+`cf_clearance=<value>`. The server already sends a browser User-Agent by default, since it is
+carrying a browser session cookie; `CANVAS_USER_AGENT` overrides that if needed.
 
 ### Verify it works
 
@@ -112,7 +127,7 @@ rather than letting a thin answer look complete.
 
 ## Layout
 
-```
+```text
 src/
   index.ts              stdio entrypoint
   config.ts             env parsing and validation

@@ -35,7 +35,10 @@ export function registerCourseTools(server: McpServer, client: CanvasClient): vo
                     `- Signed in as: ${self.name ?? self.short_name ?? 'unknown'}`,
                     `- User id: ${idToString(self.id)}`,
                     `- Canvas host: ${client.baseUrl}`,
-                    `- Auth method: ${client.authMode}`,
+                    `- Auth method: ${client.authMode}` +
+                        (client.authMode === 'session cookie'
+                            ? ` (\`${client.sessionCookieName}\`)`
+                            : ''),
                     `- Active courses visible: ${courses.length}`,
                     client.icsFeedUrl
                         ? '- Calendar feed fallback: configured'

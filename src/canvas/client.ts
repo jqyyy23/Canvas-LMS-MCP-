@@ -6,10 +6,7 @@
  * method through. There is no post/put/delete to accidentally reach for.
  */
 
-import type { CanvasConfig } from '../config.js';
-
-const SESSION_COOKIE = '_normandy_session';
-const REMEMBER_COOKIE = 'pseudonym_credentials';
+import { REMEMBER_COOKIE_NAME, type CanvasConfig } from '../config.js';
 
 /** Stop following `rel="next"` past this, so a bad query can't spin forever. */
 const MAX_PAGES = 20;
@@ -39,21 +36,32 @@ export class CanvasRequestError extends Error {
     }
 }
 
-export const REAUTH_INSTRUCTIONS = [
-    'Canvas rejected the credentials — your session cookie has almost certainly expired.',
-    '',
-    'To refresh it:',
-    '  1. Log into Canvas in Chrome.',
-    '  2. Press F12 and open the Application tab.',
-    '  3. Storage > Cookies > your Canvas domain.',
-    '  4. Copy the Value of `_normandy_session` into CANVAS_SESSION_COOKIE in .env.',
-    '  5. Restart the MCP server so it picks up the new value.',
-    '',
-    'The cookie is httpOnly, so `document.cookie` in the console will not show it —',
-    'the Application tab is the only place to read it.',
-    'Tip: checking "Stay signed in" at login also yields a `pseudonym_credentials`',
-    'cookie that lasts ~2 weeks; set it as CANVAS_REMEMBER_COOKIE to refresh far less often.',
-].join('\n');
+/**
+ * Names the actual cookie this install uses, because the whole failure mode this
+ * message addresses is looking at the wrong cookie in DevTools.
+ */
+export function reauthInstructions(cookieName: string): string {
+    return [
+        'Canvas rejected the credentials — your session cookie has almost certainly expired.',
+        '',
+        'To refresh it:',
+        '  1. Log into Canvas in Chrome.',
+        '  2. Press F12 and open the Application tab.',
+        '  3. Storage > Cookies > your Canvas domain.',
+        `  4. Copy the Value of \`${cookieName}\` into CANVAS_SESSION_COOKIE in .env.`,
+        '  5. Restart the MCP server so it picks up the new value.',
+        '',
+        'The cookie is httpOnly, so `document.cookie` in the console will not show it —',
+        'the Application tab is the only place to read it.',
+        '',
+        `If you do not see a cookie named \`${cookieName}\`, your Canvas uses a different`,
+        'name (upstream Canvas ships `_normandy_session`). Set CANVAS_SESSION_COOKIE_NAME',
+        'to whichever large httpOnly cookie your Canvas domain sets.',
+        '',
+        'Tip: checking "Stay signed in" at login also yields a `pseudonym_credentials`',
+        'cookie that lasts ~2 weeks; set it as CANVAS_REMEMBER_COOKIE to refresh far less often.',
+    ].join('\n');
+}
 
 interface CacheEntry {
     expiresAt: number;
@@ -69,8 +77,8 @@ export class CanvasClient {
     /**
      * Live session value. Starts from config but Canvas rotates it — when it
      * re-establishes a session from the remember-me cookie it hands back a fresh
-     * `_normandy_session` in Set-Cookie. Tracking that keeps a long-running
-     * server alive instead of dying an hour in.
+     * session cookie in Set-Cookie. Tracking that keeps a long-running server
+     * alive instead of dying an hour in.
      */
     private sessionCookie: string;
     private readonly cache = new Map<string, CacheEntry>();
@@ -93,10 +101,15 @@ export class CanvasClient {
         return this.config.accessToken ? 'access token' : 'session cookie';
     }
 
+    /** The session cookie name this install uses. */
+    get sessionCookieName(): string {
+        return this.config.sessionCookieName;
+    }
+
     private buildHeaders(): Record<string, string> {
         const headers: Record<string, string> = {
             Accept: 'application/json+canvas-string-ids, application/json',
-            'User-Agent': 'canvas-mcp (personal read-only client)',
+            'User-Agent': this.config.userAgent,
         };
 
         if (this.config.accessToken) {
@@ -105,10 +118,14 @@ export class CanvasClient {
         }
 
         const cookies: string[] = [];
-        if (this.sessionCookie) cookies.push(`${SESSION_COOKIE}=${this.sessionCookie}`);
-        if (this.config.rememberCookie) {
-            cookies.push(`${REMEMBER_COOKIE}=${this.config.rememberCookie}`);
+        if (this.sessionCookie) {
+            cookies.push(`${this.config.sessionCookieName}=${this.sessionCookie}`);
         }
+        if (this.config.rememberCookie) {
+            cookies.push(`${REMEMBER_COOKIE_NAME}=${this.config.rememberCookie}`);
+        }
+        // e.g. cf_clearance for a Canvas behind Cloudflare.
+        if (this.config.extraCookies) cookies.push(this.config.extraCookies);
         headers['Cookie'] = cookies.join('; ');
         return headers;
     }
@@ -116,10 +133,12 @@ export class CanvasClient {
     /** Pick up a rotated session cookie so the process keeps working. */
     private captureRotatedCookie(response: Response): void {
         const setCookie = response.headers.getSetCookie?.() ?? [];
+        const prefix = `${this.config.sessionCookieName}=`;
         for (const raw of setCookie) {
-            const match = /^_normandy_session=([^;]+)/.exec(raw);
-            if (match?.[1] && match[1] !== this.sessionCookie) {
-                this.sessionCookie = match[1];
+            if (!raw.startsWith(prefix)) continue;
+            const value = raw.slice(prefix.length).split(';')[0];
+            if (value && value !== this.sessionCookie) {
+                this.sessionCookie = value;
             }
         }
     }
@@ -192,7 +211,7 @@ export class CanvasClient {
                 this.captureRotatedCookie(response);
 
                 if (response.status === 401) {
-                    throw new CanvasAuthError(REAUTH_INSTRUCTIONS);
+                    throw new CanvasAuthError(reauthInstructions(this.config.sessionCookieName));
                 }
 
                 // Canvas reports rate limiting as a 403 with a distinctive body.
@@ -245,7 +264,7 @@ export class CanvasClient {
         const body = await response.text();
 
         if (CanvasClient.looksLikeLoginPage(contentType, body)) {
-            throw new CanvasAuthError(REAUTH_INSTRUCTIONS);
+            throw new CanvasAuthError(reauthInstructions(this.config.sessionCookieName));
         }
         if (!response.ok) {
             throw new CanvasRequestError(
