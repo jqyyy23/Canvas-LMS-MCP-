@@ -34,9 +34,10 @@ Two consequences worth knowing:
 - **Read-only is enforced structurally.** The `CanvasClient` class exposes one request primitive
   that hardcodes `method: 'GET'`. There is no `post`/`put`/`delete` to reach for by accident. This
   also means no CSRF token is ever needed, since Rails only verifies CSRF on non-GET requests.
-- **You will re-paste the cookie periodically** — roughly once a day, or once every two weeks if
-  you also set `CANVAS_REMEMBER_COOKIE`. When it lapses, every tool returns step-by-step refresh
-  instructions rather than an error, and deadline tools fall back to the calendar feed.
+- **You will re-paste the cookie periodically** — about daily under SSO, or every two weeks if your
+  Canvas offers a "Stay signed in" cookie. `npm run cookie` makes that one command, and the server
+  picks up the new value without restarting. When it does lapse, every tool returns step-by-step
+  refresh instructions rather than an error, and deadline tools fall back to the calendar feed.
 - **The cookie's name is per-institution**, so it's configurable. See below.
 
 One caution: reading your own coursework is data you're already authorized to see, but automated
@@ -67,9 +68,29 @@ open-source Canvas ships `_normandy_session`; other installs rename it again. Wh
 match. This matters because Canvas silently ignores a cookie name it doesn't recognize, so a
 mismatch is indistinguishable from an expired session. `check_canvas_auth` prints the name in use.
 
-While you're there, also copy `pseudonym_credentials` into `CANVAS_REMEMBER_COOKIE` if it exists —
-it only appears if you ticked "Stay signed in", and it stretches the refresh interval to ~2 weeks.
-If it isn't there, log out and back in with that box checked.
+If a `pseudonym_credentials` cookie exists, copy it into `CANVAS_REMEMBER_COOKIE` too — it
+stretches the refresh interval to ~2 weeks. **It won't exist if your school uses single sign-on**
+(UBC's CWL, for instance): Canvas delegates login to the campus identity provider, so its own
+"Stay signed in" box never appears. In that case you're on the ~1-day cookie with no way to extend
+it, which is what the refresh command below is for.
+
+### Refreshing the cookie
+
+```bash
+npm run cookie          # reads the value straight from your clipboard
+npm run cookie -- <value>
+```
+
+This rewrites just the one line in `.env` (comments and your other settings survive), then verifies
+the cookie against Canvas immediately, so you find out it worked here rather than from a failing
+tool call later.
+
+**No restart needed.** The server re-reads `.env` whenever a request fails authentication and
+retries once with the new credential. It only retries when the value actually changed, so a
+genuinely dead cookie still fails fast instead of looping.
+
+Under SSO the refresh is usually quick: your campus session outlives the Canvas one, so opening
+Canvas is a silent redirect rather than a fresh password prompt.
 
 ### If your Canvas is behind Cloudflare
 

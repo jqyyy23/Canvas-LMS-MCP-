@@ -6,7 +6,7 @@
  * method through. There is no post/put/delete to accidentally reach for.
  */
 
-import { REMEMBER_COOKIE_NAME, type CanvasConfig } from '../config.js';
+import { loadConfig, readEnvFile, REMEMBER_COOKIE_NAME, type CanvasConfig } from '../config.js';
 
 /** Stop following `rel="next"` past this, so a bad query can't spin forever. */
 const MAX_PAGES = 20;
@@ -73,7 +73,7 @@ export interface QueryParams {
 }
 
 export class CanvasClient {
-    private readonly config: CanvasConfig;
+    private config: CanvasConfig;
     /**
      * Live session value. Starts from config but Canvas rotates it — when it
      * re-establishes a session from the remember-me cookie it hands back a fresh
@@ -86,6 +86,35 @@ export class CanvasClient {
     constructor(config: CanvasConfig) {
         this.config = config;
         this.sessionCookie = config.sessionCookie;
+    }
+
+    /**
+     * Re-reads `.env` and adopts a newly pasted credential.
+     *
+     * Returns true only when the credential actually changed, so an auth failure
+     * retries at most once and only when retrying could plausibly help. On an
+     * SSO-backed Canvas the cookie expires daily and cannot be extended, so this
+     * is what removes "restart the server" from the refresh ritual.
+     */
+    private reloadCredentials(): boolean {
+        let next: CanvasConfig;
+        try {
+            next = loadConfig({ ...process.env, ...readEnvFile() });
+        } catch {
+            return false; // .env missing or unparseable; keep what we have
+        }
+        const changed =
+            next.sessionCookie !== this.sessionCookie ||
+            next.accessToken !== this.config.accessToken ||
+            next.rememberCookie !== this.config.rememberCookie ||
+            next.extraCookies !== this.config.extraCookies;
+        if (!changed) return false;
+
+        this.config = next;
+        this.sessionCookie = next.sessionCookie;
+        // Cached responses were produced under the old identity.
+        this.cache.clear();
+        return true;
     }
 
     get baseUrl(): string {
@@ -197,6 +226,8 @@ export class CanvasClient {
     /** Single GET with timeout and retry. Returns the raw Response. */
     private async fetchOnce(url: string): Promise<Response> {
         let lastError: Error | undefined;
+        /** Guards the one credential-reload retry, so a dead cookie can't loop. */
+        let reloadTried = false;
 
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             const controller = new AbortController();
@@ -211,6 +242,13 @@ export class CanvasClient {
                 this.captureRotatedCookie(response);
 
                 if (response.status === 401) {
+                    // You may have pasted a fresh cookie into .env since this
+                    // process started. Adopt it and retry, without a restart.
+                    if (!reloadTried && this.reloadCredentials()) {
+                        reloadTried = true;
+                        attempt--; // the reload, not the network, gets this try
+                        continue;
+                    }
                     throw new CanvasAuthError(reauthInstructions(this.config.sessionCookieName));
                 }
 
@@ -275,37 +313,64 @@ export class CanvasClient {
         return CanvasClient.parseJson(body, url);
     }
 
+    /**
+     * Runs an operation and, if it fails authentication, adopts a freshly pasted
+     * credential from `.env` and tries once more.
+     *
+     * `fetchOnce` already does this for a 401; this also covers the login-page
+     * redirect some SSO-fronted installs serve instead, which is only detectable
+     * after the body is read.
+     */
+    private async withCredentialReload<T>(run: () => Promise<T>): Promise<T> {
+        try {
+            return await run();
+        } catch (err) {
+            if (err instanceof CanvasAuthError && this.reloadCredentials()) {
+                return await run();
+            }
+            throw err;
+        }
+    }
+
     /** GET a single JSON object. */
     async get<T>(path: string, params?: QueryParams): Promise<T> {
         const url = this.buildUrl(path, params);
-        const response = await this.fetchOnce(url);
-        return (await this.readBody(response, url)) as T;
+        return this.withCredentialReload(async () => {
+            const response = await this.fetchOnce(url);
+            return (await this.readBody(response, url)) as T;
+        });
     }
 
     /** GET a paginated collection, following `rel="next"` to the end. */
     async getAll<T>(path: string, params?: QueryParams): Promise<T[]> {
-        let url = this.buildUrl(path, { per_page: PER_PAGE, ...params });
-        const results: T[] = [];
+        const firstUrl = this.buildUrl(path, { per_page: PER_PAGE, ...params });
 
-        for (let page = 0; page < MAX_PAGES; page++) {
-            const response = await this.fetchOnce(url);
-            const nextUrl = CanvasClient.parseNextLink(response.headers.get('link'));
-            const body = await this.readBody(response, url);
+        // The whole pagination walk is the retried unit: a credential swap
+        // partway through would otherwise splice two identities' pages together.
+        return this.withCredentialReload(async () => {
+            let url = firstUrl;
+            const results: T[] = [];
 
-            if (Array.isArray(body)) {
-                results.push(...(body as T[]));
-            } else if (body && typeof body === 'object') {
-                // A few Canvas endpoints wrap the list in a single-key object.
-                const values = Object.values(body as Record<string, unknown>);
-                const firstArray = values.find((v): v is T[] => Array.isArray(v));
-                if (firstArray) results.push(...firstArray);
+            for (let page = 0; page < MAX_PAGES; page++) {
+                const response = await this.fetchOnce(url);
+                const nextUrl = CanvasClient.parseNextLink(response.headers.get('link'));
+                const body = await this.readBody(response, url);
+
+                if (Array.isArray(body)) {
+                    results.push(...(body as T[]));
+                } else if (body && typeof body === 'object') {
+                    // A few Canvas endpoints wrap the list in a single-key object.
+                    const values = Object.values(body as Record<string, unknown>);
+                    const firstArray = values.find((v): v is T[] => Array.isArray(v));
+                    if (firstArray) results.push(...firstArray);
+                }
+
+                if (!nextUrl) break;
+                url = nextUrl;
             }
 
-            if (!nextUrl) break;
-            url = nextUrl;
-        }
-
-        return results;
+            return results;
+        });
     }
 
     /**

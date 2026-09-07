@@ -1,10 +1,14 @@
 /**
  * Environment configuration.
  *
- * Loaded once at startup. Anything invalid fails fast with a message that says
- * what to fix, because a misconfigured server is by far the most likely problem
- * you will hit with this thing.
+ * Loaded at startup, and re-readable from disk afterwards so a refreshed session
+ * cookie takes effect without restarting the server. Anything invalid fails fast
+ * with a message that says what to fix, because a misconfigured server is by far
+ * the most likely problem you will hit with this thing.
  */
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Default session cookie name.
@@ -50,6 +54,55 @@ export class ConfigError extends Error {}
 
 function clean(value: string | undefined): string {
     return (value ?? '').trim();
+}
+
+/**
+ * Where `.env` lives, resolved from this module rather than `process.cwd()` so it
+ * is found no matter what directory the MCP host launched the server from.
+ */
+export function envFilePath(): string {
+    const override = clean(process.env['CANVAS_ENV_FILE']);
+    if (override) return override;
+    // build/src/config.js -> project root
+    return fileURLToPath(new URL('../../.env', import.meta.url));
+}
+
+/**
+ * Re-reads `.env` from disk.
+ *
+ * Node's `--env-file` only reads at startup, but on an SSO-backed Canvas the
+ * session cookie expires daily and cannot be extended, so requiring a server
+ * restart after every refresh would be the most irritating part of using this.
+ * Reading the file again lets a pasted cookie take effect on the next tool call.
+ *
+ * Deliberately minimal: enough for `KEY=value` lines with optional quotes and
+ * `#` comments, which is all this file ever contains.
+ */
+export function readEnvFile(path = envFilePath()): NodeJS.ProcessEnv {
+    let raw: string;
+    try {
+        raw = readFileSync(path, 'utf8');
+    } catch {
+        return {};
+    }
+
+    const env: NodeJS.ProcessEnv = {};
+    for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eq = trimmed.indexOf('=');
+        if (eq <= 0) continue;
+        const key = trimmed.slice(0, eq).trim();
+        let value = trimmed.slice(eq + 1).trim();
+        if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+        ) {
+            value = value.slice(1, -1);
+        }
+        env[key] = value;
+    }
+    return env;
 }
 
 /**
