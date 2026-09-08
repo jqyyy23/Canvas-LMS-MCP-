@@ -1,0 +1,18 @@
+# Belt and braces. `npm run pack` builds the bundle from a staged allowlist in
+# dist-mcpb/, so nothing here should ever match — but `mcpb pack` run by hand
+# against the repo root would otherwise sweep up a live Canvas session cookie.
+#
+# Patterns are root-anchored on purpose: a bare `src/` would also delete
+# `node_modules/zod/src/`, quietly shipping a broken dependency.
+/.env
+/.env.*
+/*.env
+/.git/
+/.claude/
+/src/
+/scripts/
+/dist-mcpb/
+/*.mcpb
+node_modules/.cache/
+node_modules/.bin/
+*.tsbuildinfo

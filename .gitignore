@@ -9,3 +9,7 @@ build/
 npm-debug.log*
 *.tsbuildinfo
 .DS_Store
+
+# Bundle build artifacts — regenerate with `npm run pack`.
+dist-mcpb/
+*.mcpb

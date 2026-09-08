@@ -6,7 +6,14 @@
  * method through. There is no post/put/delete to accidentally reach for.
  */
 
-import { loadConfig, readEnvFile, REMEMBER_COOKIE_NAME, type CanvasConfig } from '../config.js';
+import {
+    REMEMBER_COOKIE_NAME,
+    cookieSetupSteps,
+    isBundleInstall,
+    loadConfig,
+    readEnvFile,
+    type CanvasConfig,
+} from '../config.js';
 
 /** Stop following `rel="next"` past this, so a bad query can't spin forever. */
 const MAX_PAGES = 20;
@@ -45,21 +52,15 @@ export function reauthInstructions(cookieName: string): string {
         'Canvas rejected the credentials — your session cookie has almost certainly expired.',
         '',
         'To refresh it:',
-        '  1. Log into Canvas in Chrome.',
-        '  2. Press F12 and open the Application tab.',
-        '  3. Storage > Cookies > your Canvas domain.',
-        `  4. Copy the Value of \`${cookieName}\` into CANVAS_SESSION_COOKIE in .env.`,
-        '  5. Restart the MCP server so it picks up the new value.',
+        cookieSetupSteps(cookieName),
         '',
-        'The cookie is httpOnly, so `document.cookie` in the console will not show it —',
-        'the Application tab is the only place to read it.',
-        '',
-        `If you do not see a cookie named \`${cookieName}\`, your Canvas uses a different`,
-        'name (upstream Canvas ships `_normandy_session`). Set CANVAS_SESSION_COOKIE_NAME',
-        'to whichever large httpOnly cookie your Canvas domain sets.',
-        '',
-        'Tip: checking "Stay signed in" at login also yields a `pseudonym_credentials`',
-        'cookie that lasts ~2 weeks; set it as CANVAS_REMEMBER_COOKIE to refresh far less often.',
+        ...(isBundleInstall()
+            ? []
+            : [
+                  'Tip: checking "Stay signed in" at login also yields a `pseudonym_credentials`',
+                  'cookie lasting ~2 weeks; set it as CANVAS_REMEMBER_COOKIE to refresh far less',
+                  "often. Single sign-on logins (UBC's CWL among them) never offer that box.",
+              ]),
     ].join('\n');
 }
 
@@ -391,7 +392,12 @@ export class CanvasClient {
     /** Fetch the token-free ICS calendar feed as raw text. */
     async fetchIcsFeed(): Promise<string> {
         if (!this.config.icsFeedUrl) {
-            throw new CanvasRequestError('CANVAS_ICS_FEED_URL is not configured.');
+            throw new CanvasRequestError(
+                isBundleInstall()
+                    ? 'No calendar feed configured. Add one in Settings > Extensions > Canvas: ' +
+                      'in Canvas, open Calendar and click "Calendar Feed" to get the URL.'
+                    : 'CANVAS_ICS_FEED_URL is not configured.',
+            );
         }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

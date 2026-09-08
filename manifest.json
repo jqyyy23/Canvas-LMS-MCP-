@@ -1,0 +1,93 @@
+{
+  "manifest_version": "0.3",
+  "name": "canvas-ubc",
+  "display_name": "Canvas (UBC)",
+  "version": "0.1.0",
+  "description": "Read-only access to your UBC Canvas deadlines, announcements, and grades.",
+  "long_description": "Ask Claude what you have due, what your instructors posted, and how your grades are doing, without opening Canvas.\n\nThis extension reads your Canvas account using the session cookie from your own browser, so it sees exactly what you see and nothing more. It is strictly read-only: it can never post, submit, or change anything in Canvas.\n\n**Setup takes one paste.** Log into canvas.ubc.ca in Chrome, press F12, open the Application tab, go to Storage → Cookies → https://canvas.ubc.ca, and copy the Value of the `canvas_session` cookie into the settings field below.\n\n**UBC logs you in through CWL single sign-on, so Canvas sessions last about a day.** When Claude tells you the session expired, repeat that paste in this extension's settings. Filling in the optional calendar feed URL keeps deadline questions answering even after the cookie lapses.",
+  "author": {
+    "name": "J"
+  },
+  "icon": "icon.png",
+  "license": "MIT",
+  "keywords": ["canvas", "lms", "ubc", "school", "deadlines", "assignments", "grades"],
+  "server": {
+    "type": "node",
+    "entry_point": "build/src/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/build/src/index.js"],
+      "env": {
+        "CANVAS_BASE_URL": "${user_config.canvas_url}",
+        "CANVAS_SESSION_COOKIE": "${user_config.session_cookie}",
+        "CANVAS_SESSION_COOKIE_NAME": "canvas_session",
+        "CANVAS_ICS_FEED_URL": "${user_config.ics_feed_url}",
+        "CANVAS_INSTALL": "mcpb"
+      }
+    }
+  },
+  "user_config": {
+    "session_cookie": {
+      "type": "string",
+      "title": "Canvas session cookie",
+      "description": "Log into canvas.ubc.ca in Chrome, press F12, open the Application tab, then Storage > Cookies > https://canvas.ubc.ca. Copy the Value of the cookie named canvas_session and paste it here. It is httpOnly, so the Console tab cannot show it -- the Application tab is the only place to read it. UBC sessions expire after about a day; come back here and repaste when Claude says the session has expired.",
+      "sensitive": true,
+      "required": true
+    },
+    "ics_feed_url": {
+      "type": "string",
+      "title": "Calendar feed URL (optional, recommended)",
+      "description": "In Canvas, open Calendar and click 'Calendar Feed' at the bottom right, then paste the whole URL here. This needs no cookie, so deadline questions keep working for the hours between your session expiring and you noticing. Announcements and grades still need a live cookie.",
+      "sensitive": true,
+      "required": false
+    },
+    "canvas_url": {
+      "type": "string",
+      "title": "Canvas address",
+      "description": "Leave this alone unless you are not at UBC.",
+      "default": "https://canvas.ubc.ca",
+      "required": true
+    }
+  },
+  "tools": [
+    {
+      "name": "get_daily_briefing",
+      "description": "One consolidated digest: work due soon, anything overdue and unsubmitted, new announcements, and recently graded assignments."
+    },
+    {
+      "name": "get_upcoming_work",
+      "description": "Everything due soon across all courses, grouped by day, with submission status and anything already overdue."
+    },
+    {
+      "name": "get_announcements",
+      "description": "Recent announcements posted by instructors across your active courses, newest first, with body text."
+    },
+    {
+      "name": "get_grades",
+      "description": "Your current grade in each active course, and optionally the individual assignments graded recently."
+    },
+    {
+      "name": "list_courses",
+      "description": "Your active courses with their ids, codes, term, and current grade."
+    },
+    {
+      "name": "get_course_detail",
+      "description": "Everything about one course: syllabus, module progress, and instructor contact details."
+    },
+    {
+      "name": "get_assignment_detail",
+      "description": "The full text of one assignment: instructions, due date, points, submission types, rubric, and your submission status."
+    },
+    {
+      "name": "check_canvas_auth",
+      "description": "Verifies the Canvas credentials work and reports who you are signed in as."
+    }
+  ],
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin", "win32"],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  }
+}

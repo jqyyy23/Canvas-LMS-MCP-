@@ -4,7 +4,9 @@ A read-only [MCP](https://modelcontextprotocol.io) server for Canvas LMS, so Cla
 deadlines, announcements, and grades in the same conversation where it checks your email — instead
 of you checking Canvas on a separate site.
 
-Personal project, single user, **read-only**: it can look at Canvas, never change it.
+**Read-only**: it can look at Canvas, never change it. Ships two ways — as a one-file
+[`.mcpb` extension](#install-it-students) for classmates on Claude Desktop, and as a
+[source checkout](#developing-from-source) for Claude Code.
 
 ## What it can do
 
@@ -18,6 +20,38 @@ Personal project, single user, **read-only**: it can look at Canvas, never chang
 | `get_assignment_detail` | Full instructions, rubric, due date, and your submission status for one assignment. |
 | `list_courses` | Your active courses and their ids. |
 | `check_canvas_auth` | "Is the connection alive?" Run this first when something looks wrong. |
+
+## Install it (students)
+
+You need Claude Desktop and a UBC Canvas login. You do **not** need Node, git, or a terminal —
+Claude Desktop ships its own Node runtime and the extension carries its own dependencies.
+
+1. Get `canvas-ubc.mcpb` (ask whoever sent you here, or build it yourself — see
+   [Building the bundle](#building-the-bundle)).
+2. Double-click it, or drag it onto the Claude Desktop window. Either opens the install screen,
+   which lists the eight tools above before you agree to anything.
+3. Fill in the one required field, **Canvas session cookie**:
+   - Log into [canvas.ubc.ca](https://canvas.ubc.ca) in Chrome.
+   - Press `F12`, open the **Application** tab.
+   - **Storage → Cookies → `https://canvas.ubc.ca`**.
+   - Copy the **Value** of the row named `canvas_session` and paste it in.
+4. Optional but worth 30 seconds: in Canvas open **Calendar → Calendar Feed** (bottom right) and
+   paste that whole URL into **Calendar feed URL**. It keeps deadline questions answering during
+   the hours between your session expiring and you noticing.
+5. Ask Claude *"catch me up on school."*
+
+Both fields are marked sensitive in the manifest, so Claude Desktop stores them in Windows
+Credential Manager or the macOS Keychain rather than in a file on disk.
+
+### When it says the session expired
+
+UBC logs you in through CWL single sign-on. Canvas never offers its own "Stay signed in" box under
+SSO, so **the session cookie lasts about a day and there is no way to extend it.** This is a
+property of UBC's login, not something the extension can fix.
+
+Refreshing is the same paste as step 3: **Settings → Extensions → Canvas (UBC)**, replace the
+cookie, save. The extension restarts itself. Every tool tells you this when it happens, so you
+never have to remember it.
 
 ## Why it authenticates with a cookie
 
@@ -44,7 +78,7 @@ One caution: reading your own coursework is data you're already authorized to se
 access may still fall under your institution's acceptable-use policy. This server is built to be a
 polite client — GET-only, cached, low request volume. Keep it that way.
 
-## Setup
+## Developing from source
 
 ```bash
 npm install
@@ -131,11 +165,59 @@ For Claude Desktop, add to `claude_desktop_config.json`:
 }
 ```
 
+Pointing Claude Desktop at a checkout like this is the development loop. For anyone who is not
+editing the code, build the bundle instead — it needs no paths, no Node, and no `.env`.
+
 To poke at the tools directly:
 
 ```bash
 npm run inspect     # opens the MCP Inspector
 ```
+
+### Building the bundle
+
+```bash
+npm run pack        # -> canvas-ubc.mcpb, ~4 MB
+```
+
+That is the whole release process; hand the resulting file to a classmate. `scripts/pack.mjs`:
+
+1. Builds, then asks the compiled server for its real `tools/list` and fails if `manifest.json`
+   disagrees — the install screen shows that list, and a stale entry there is a promise the
+   server does not keep.
+2. Stages `dist-mcpb/` from an explicit allowlist: `build/src`, `manifest.json`, `icon.png`, a
+   trimmed `package.json` (Node needs `"type": "module"` next to the ESM output), and the
+   production dependency tree resolved via `npm ls --omit=dev`. `build/scripts` is excluded — the
+   cookie helper is a maintainer tool.
+3. Walks the staged tree and refuses to pack if anything `.env`-, `.pem`-, or `.key`-shaped is in
+   it.
+4. Runs `mcpb validate`, then `mcpb pack`.
+
+**Step 3 is the point of staging at all.** `.env` in this repo holds a live Canvas session cookie
+for whoever runs the build; a bundle built by zipping the working directory would hand a classmate
+your account. An allowlist cannot leak a file nobody remembered to deny. `.mcpbignore` covers the
+same ground for anyone who runs `mcpb pack` here by hand.
+
+The icon is generated too — `npm run icon` redraws `icon.png` from `scripts/make-icon.mjs`, so it
+can be recoloured without a design tool.
+
+### What differs inside the bundle
+
+The extension gets its settings from `manifest.json`'s `user_config`, which Claude Desktop renders
+as a form and injects as environment variables. Two consequences the code accounts for:
+
+- **There is no `.env` and no terminal**, so every "here is how to fix this" message forks on
+  `isBundleInstall()` (set by `CANVAS_INSTALL=mcpb` in the manifest) and tells extension users to
+  edit the settings field instead. Telling someone to edit a file they cannot see is the worst
+  thing these messages could do. The hot-reload in `readEnvFile` simply finds nothing and the
+  server fails fast, which is correct: Claude Desktop restarts it on a settings change anyway.
+- **A blank optional field can arrive as the literal string `${user_config.ics_feed_url}`**, so
+  `clean()` in `config.ts` reads an unsubstituted placeholder as empty. Without that, an untouched
+  calendar-feed box becomes a garbage URL that fails deep inside a request.
+
+`CANVAS_ACCESS_TOKEN`, `CANVAS_REMEMBER_COOKIE`, and `CANVAS_EXTRA_COOKIES` are deliberately not in
+`user_config`: none apply at UBC, and every extra field in that form is one more thing a student
+has to decide about. They still work from a source checkout.
 
 ## The calendar-feed fallback
 

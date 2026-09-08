@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "cookie": "npm run build && node build/scripts/refresh-cookie.js",
     "smoke": "npm run build && node --env-file-if-exists=.env build/scripts/smoke.js",
-    "inspect": "npm run build && npx @modelcontextprotocol/inspector node --env-file-if-exists=.env ./build/src/index.js"
+    "inspect": "npm run build && npx @modelcontextprotocol/inspector node --env-file-if-exists=.env ./build/src/index.js",
+    "icon": "node scripts/make-icon.mjs",
+    "pack": "node scripts/pack.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

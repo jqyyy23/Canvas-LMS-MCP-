@@ -8,12 +8,21 @@
 
 import { CanvasClient } from '../canvas/client.js';
 import { eventsInWindow, parseIcs } from '../canvas/ics.js';
+import { isBundleInstall } from '../config.js';
 import { dayKey, describeDay, formatTime } from '../format.js';
 
+/**
+ * Shown at the top of every degraded answer. It names the one action that fixes
+ * things, which is a different action depending on how this copy was installed —
+ * an extension user has no `.env` and no terminal to refresh from.
+ */
 export const DEGRADED_BANNER = [
     '> ⚠ **Degraded mode — Canvas session expired.**',
     '> Showing deadlines from your calendar feed only. Submission status, announcements',
-    '> and grades are unavailable until you refresh `CANVAS_SESSION_COOKIE` in `.env`.',
+    isBundleInstall()
+        ? '> and grades stay unavailable until you paste a fresh session cookie into' +
+          ' Settings > Extensions > Canvas.'
+        : '> and grades are unavailable until you refresh `CANVAS_SESSION_COOKIE` in `.env`.',
 ].join('\n');
 
 /**

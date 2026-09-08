@@ -52,8 +52,55 @@ const DEFAULT_USER_AGENT =
 
 export class ConfigError extends Error {}
 
+/**
+ * An optional `user_config` field the student left blank can reach us as the
+ * literal string `${user_config.ics_feed_url}` rather than as nothing at all.
+ * Treating that as a real value produces a baffling failure deep inside a
+ * request, so unsubstituted placeholders are read as empty here, for every key.
+ */
 function clean(value: string | undefined): string {
-    return (value ?? '').trim();
+    const trimmed = (value ?? '').trim();
+    return /^\$\{[A-Za-z_]+(\.[A-Za-z0-9_]+)*\}$/.test(trimmed) ? '' : trimmed;
+}
+
+/**
+ * Whether this copy is running as an installed `.mcpb` extension rather than
+ * from a git checkout. Set by `manifest.json`; nothing else sets it.
+ */
+export function isBundleInstall(env: NodeJS.ProcessEnv = process.env): boolean {
+    return clean(env['CANVAS_INSTALL']) === 'mcpb';
+}
+
+/**
+ * How to fetch the session cookie, worded for how this copy was installed.
+ *
+ * An extension has no `.env` and no terminal: the student refreshes the cookie by
+ * editing a field in Claude Desktop's settings, which restarts the server for
+ * them. Directing them to edit a file they cannot see is the worst thing this
+ * message could do, so the last step forks and everything around it is shared.
+ */
+export function cookieSetupSteps(
+    cookieName: string,
+    env: NodeJS.ProcessEnv = process.env,
+): string {
+    return [
+        '  1. Log into Canvas in Chrome.',
+        '  2. Press F12 and open the Application tab.',
+        '  3. Storage > Cookies > your Canvas domain.',
+        `  4. Copy the Value of the \`${cookieName}\` cookie.`,
+        ...(isBundleInstall(env)
+            ? [
+                  '  5. In Claude Desktop open Settings > Extensions > Canvas, paste it into',
+                  '     "Canvas session cookie", and save. The extension restarts itself.',
+              ]
+            : [
+                  '  5. Paste it into CANVAS_SESSION_COOKIE in .env, or run `npm run cookie`,',
+                  '     which takes it from your clipboard and verifies it on the spot.',
+              ]),
+        '',
+        'The cookie is httpOnly, so `document.cookie` in the console will not show it —',
+        'the Application tab is the only place to read it.',
+    ].join('\n');
 }
 
 /**
@@ -122,8 +169,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CanvasConfig {
     const rawBase = clean(env['CANVAS_BASE_URL']);
     if (!rawBase) {
         throw new ConfigError(
-            'CANVAS_BASE_URL is not set. Copy .env.example to .env and set it to your ' +
-                'Canvas domain, e.g. https://yourschool.instructure.com',
+            isBundleInstall(env)
+                ? 'No Canvas address set. Open Settings > Extensions > Canvas in Claude ' +
+                  'Desktop and set "Canvas address" to https://canvas.ubc.ca'
+                : 'CANVAS_BASE_URL is not set. Copy .env.example to .env and set it to your ' +
+                  'Canvas domain, e.g. https://yourschool.instructure.com',
         );
     }
 
@@ -156,14 +206,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CanvasConfig {
 
     if (!accessToken && !sessionCookie && !rememberCookie) {
         throw new ConfigError(
-            'No Canvas credentials found. Set CANVAS_SESSION_COOKIE in .env to your ' +
-                'Canvas session cookie value.\n\n' +
-                'To get it: log into Canvas in Chrome, press F12, open the Application tab, ' +
-                'then Storage > Cookies > your Canvas domain. Look for a large, httpOnly ' +
-                `cookie named \`${sessionCookieName}\` (some installs call it ` +
-                '`_normandy_session` instead — if yours does, also set ' +
-                'CANVAS_SESSION_COOKIE_NAME to match). It is httpOnly, so `document.cookie` ' +
-                'in the console will not show it — the Application tab is the only way.',
+            (isBundleInstall(env)
+                ? 'No Canvas session cookie set yet.\n\n'
+                : 'No Canvas credentials found. Set CANVAS_SESSION_COOKIE.\n\n') +
+                cookieSetupSteps(sessionCookieName, env) +
+                '\n\nIf there is no cookie by that name, your Canvas calls it something ' +
+                'else (upstream Canvas ships `_normandy_session`); set ' +
+                'CANVAS_SESSION_COOKIE_NAME to match.',
         );
     }
 

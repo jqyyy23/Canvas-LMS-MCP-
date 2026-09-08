@@ -10,6 +10,7 @@ import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { CanvasClient } from '../canvas/client.js';
 import { courseLabel, getActiveCourses, getPendingCourseCount, getSelf } from '../canvas/queries.js';
+import { isBundleInstall } from '../config.js';
 import { formatScore, idToString } from '../format.js';
 import { guard, READ_ONLY } from './shared.js';
 
@@ -46,7 +47,10 @@ export function registerCourseTools(server: McpServer, client: CanvasClient): vo
                         : []),
                     client.icsFeedUrl
                         ? '- Calendar feed fallback: configured'
-                        : '- Calendar feed fallback: not configured (set CANVAS_ICS_FEED_URL)',
+                        : '- Calendar feed fallback: not configured ' +
+                          (isBundleInstall()
+                              ? '(add your Canvas calendar feed URL in Settings > Extensions > Canvas)'
+                              : '(set CANVAS_ICS_FEED_URL)'),
                 ].join('\n');
             }),
     );
