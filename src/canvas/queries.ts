@@ -42,6 +42,23 @@ export function getActiveCourses(client: CanvasClient): Promise<CanvasCourse[]> 
     });
 }
 
+/**
+ * Courses you are enrolled in that Canvas will not yet show you.
+ *
+ * Before a term opens (or before an instructor publishes), Canvas returns the
+ * course as `{ id, access_restricted_by_date: true }` and nothing else — no
+ * name, term, or dates. They are unusable, but counting them matters: at the
+ * start of a term "you have 6 courses" is alarming when you enrolled in 28, and
+ * this is the difference between "the tool is broken" and "your classes haven't
+ * opened yet".
+ */
+export function getPendingCourseCount(client: CanvasClient): Promise<number> {
+    return client.cached('courses:pending', COURSES_TTL_MS, async () => {
+        const all = await client.getAll<CanvasCourse>('/api/v1/courses');
+        return all.filter((course) => course.access_restricted_by_date).length;
+    });
+}
+
 /** Display name for a course, preferring the readable name over the code. */
 export function courseLabel(course: CanvasCourse | undefined, fallbackId?: string): string {
     if (!course) return fallbackId ? `Course ${fallbackId}` : 'Unknown course';
