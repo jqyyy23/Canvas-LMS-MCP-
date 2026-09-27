@@ -1,6 +1,6 @@
 # canvas-mcp
 
-**Never miss another deadline or announcement. No more wasted time checking modules and assignments across your courses. Automate with Claude**
+**No more time wasted checking modules, announcements and assignments across your courses and doubting that you've missed something. Automate everything with Claude.**
 
 One question pulls **every assignment, grade, and announcement across all your courses**,
 instantly, in a single answer:
