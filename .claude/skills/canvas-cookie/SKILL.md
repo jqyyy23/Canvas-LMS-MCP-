@@ -23,7 +23,7 @@ Canvas and needs to know which Canvas.
 ## 2. Write and verify the cookie
 
 Ask the user for the cookie value if you don't have it, pointing them at
-**[Get your session cookie](../../../README.md#get-your-session-cookie)**: Canvas in Chrome → `F12` →
+**[step 3 of the README](../../../README.md#3-paste-your-canvas-session-cookie)**: Canvas in Chrome → `F12` →
 **Application** → **Storage → Cookies → your Canvas domain** → copy the **Value** of
 `canvas_session`. It's `httpOnly`, so the Console can't show it.
 

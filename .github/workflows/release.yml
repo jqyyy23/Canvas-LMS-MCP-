@@ -1,0 +1,70 @@
+# Publishes the one file a friend installs.
+#
+# Push a version tag and this builds `canvas-ubc.mcpb` on a clean checkout and
+# attaches it to a GitHub Release, so the README can point at a permanent
+# "latest release" link instead of asking anyone to build it:
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# Building here rather than on a laptop is also the safer default: `npm run pack`
+# stages from an allowlist and refuses to pack anything credential-shaped, but a
+# runner has no `.env` to leak in the first place.
+#
+# Run it manually (Actions > Release > Run workflow) to get a bundle as a
+# downloadable build artifact without cutting a release.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # The install screen shows manifest.json's version, so a tag that disagrees
+      # with it ships a bundle that misreports itself.
+      - name: Check the tag matches the manifest version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          manifest=$(node -p "require('./manifest.json').version")
+          package=$(node -p "require('./package.json').version")
+          if [ "$tag" != "$manifest" ] || [ "$tag" != "$package" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match manifest.json ($manifest) / package.json ($package)."
+            exit 1
+          fi
+
+      # Type-checks, verifies manifest.json against the tools the server really
+      # registers, stages from an allowlist, then validates and packs.
+      - run: npm run pack
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canvas-ubc-mcpb
+          path: canvas-ubc.mcpb
+          if-no-files-found: error
+
+      - name: Attach the bundle to a release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" canvas-ubc.mcpb \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --latest \
+            || gh release upload "$GITHUB_REF_NAME" canvas-ubc.mcpb --clobber
