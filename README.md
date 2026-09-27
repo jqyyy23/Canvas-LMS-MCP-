@@ -1,10 +1,50 @@
 # canvas-mcp
 
-Ask Claude what you have due, what your professors posted, and how your grades are doing — without
-opening Canvas.
+**Never miss another deadline or announcement. Stop clicking through every course to find them.**
 
-It installs into **Claude Desktop as a single file**. No Node, no terminal, no config files, no
-account to make. Setup is one download and one copy-paste.
+One question to Claude pulls **every assignment, grade, and announcement across all your courses**,
+instantly, in a single answer:
+
+> **catch me up on school**
+
+```text
+# Canvas briefing — Monday, September 28
+_3 items due in the next 7 days · 1 overdue item · 1 new announcement · 1 newly graded item_
+
+## ⚠ Overdue and unsubmitted
+
+### Yesterday (Sun, Sep 27)
+  - [CPSC 210] Lab 6 — Assignment, 10 pts, 11:59 PM — **MISSING**
+
+## Due in the next 7 days
+
+### Tomorrow (Tue, Sep 29)
+  - [CPSC 210] Lab 7 — Assignment, 10 pts, 11:59 PM — **not submitted**
+
+### In 4 days (Fri, Oct 2)
+  - [MATH 200] Written Assignment 4 — Assignment, 20 pts, 5:00 PM — **not submitted**
+  - [PSYC 101] Quiz 3 — Quiz, 15 pts, 11:59 PM — **not submitted**
+
+## New announcements (last 24 hours)
+
+### [CPSC 210] Midterm 2 room change
+_Yesterday (Sun, Sep 27) at 4:12 PM by Prof. Lin_
+Thursday's midterm moves to WOOD 2, same time. Bring your student card.
+
+## Newly graded (last 24 hours)
+
+- [MATH 200] Quiz 3 — **18 / 20** (graded Yesterday (Sun, Sep 27) at 9:03 AM)
+```
+
+Then ask follow-ups in the same breath — *"what does that CPSC lab actually want?"*, *"am I still passing
+MATH?"* — because Claude already has the context.
+
+**No API setup.** No access token, no developer key, no admin approval, no account to make — the
+things that stop most Canvas tools dead at a school that locks them down. It borrows the login your
+browser already has.
+
+**One file, one paste.** It installs into Claude Desktop as a single file. No Node, no terminal, no
+config files.
 
 **Read-only by construction**: it can look at your Canvas, never change it. It cannot submit, post,
 or delete anything. [Details below.](#what-it-can-and-cannot-do)
