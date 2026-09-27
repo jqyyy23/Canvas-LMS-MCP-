@@ -5,36 +5,16 @@
 One question pulls **every assignment, grade, and announcement across all your courses**,
 instantly, in a single answer:
 
-> **catch me up on school**
+![Claude answering "When are my midterms?" with a table of five exam dates pulled from Canvas across ENPH 259, MATH 215 and MATH 217, including one the instructor said may move](docs/example-midterms.png)
 
-```text
-# Canvas briefing — Monday, September 28
-_3 items due in the next 7 days · 1 overdue item · 1 new announcement · 1 newly graded item_
+Not just a dump of due dates — it reads the announcements too, so a midterm the instructor only
+mentioned in passing shows up, and it says plainly which courses posted nothing rather than leaving
+you to assume there's nothing there.
 
-## ⚠ Overdue and unsubmitted
+![Claude answering "What are my assignments for next week?" with five unsubmitted items across four courses, the already-finished ones listed separately, and a note about what falls due right afterwards](docs/example-assignments.png)
 
-### Yesterday (Sun, Sep 27)
-  - [CPSC 210] Lab 6 — Assignment, 10 pts, 11:59 PM — **MISSING**
-
-## Due in the next 7 days
-
-### Tomorrow (Tue, Sep 29)
-  - [CPSC 210] Lab 7 — Assignment, 10 pts, 11:59 PM — **not submitted**
-
-### In 4 days (Fri, Oct 2)
-  - [MATH 200] Written Assignment 4 — Assignment, 20 pts, 5:00 PM — **not submitted**
-  - [PSYC 101] Quiz 3 — Quiz, 15 pts, 11:59 PM — **not submitted**
-
-## New announcements (last 24 hours)
-
-### [CPSC 210] Midterm 2 room change
-_Yesterday (Sun, Sep 27) at 4:12 PM by Prof. Lin_
-Thursday's midterm moves to WOOD 2, same time. Bring your student card.
-
-## Newly graded (last 24 hours)
-
-- [MATH 200] Quiz 3 — **18 / 20** (graded Yesterday (Sun, Sep 27) at 9:03 AM)
-```
+It knows what you have already submitted, so "what do I still have to do" is a question it can
+actually answer.
 
 Use with other MCPs like Google Calendar to automate adding all your assignments and deadlines to one place.
 
@@ -101,10 +81,11 @@ expiring and you noticing. [How it degrades.](#the-calendar-feed-fallback)
 
 Others worth trying:
 
-> what do I have due this week?
+> when are my midterms?
+> what are my assignments for next week?
 > did any of my professors post anything today?
 > how am I doing in my courses?
-> what exactly does the CPSC 210 assignment want?
+> what exactly does the CPEN 221 lab want?
 
 Both settings fields are marked sensitive, so Claude Desktop keeps them in the macOS Keychain or
 Windows Credential Manager rather than in a file on your disk.
@@ -383,6 +364,7 @@ manifest.json           the extension: settings form, tool list, entry point
   release.yml           tag -> bundle -> GitHub Release
 .claude/skills/
   canvas-cookie/        project skill: refresh the cookie and reload the tools
+docs/                   README screenshots
 ```
 
 ## Notes
