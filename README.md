@@ -1,8 +1,8 @@
 # canvas-mcp
 
-**Never miss another deadline or announcement. Stop clicking through every course to find them.**
+**Never miss another deadline or announcement. No more wasted time checking modules and assignments across your courses. Automate with Claude**
 
-One question to Claude pulls **every assignment, grade, and announcement across all your courses**,
+One question pulls **every assignment, grade, and announcement across all your courses**,
 instantly, in a single answer:
 
 > **catch me up on school**
@@ -36,8 +36,7 @@ Thursday's midterm moves to WOOD 2, same time. Bring your student card.
 - [MATH 200] Quiz 3 — **18 / 20** (graded Yesterday (Sun, Sep 27) at 9:03 AM)
 ```
 
-Then ask follow-ups in the same breath — *"what does that CPSC lab actually want?"*, *"am I still passing
-MATH?"* — because Claude already has the context.
+Use with other MCPs like Google Calendar to automate adding all your assignments and deadlines to one place.
 
 **No API setup.** No access token, no developer key, no admin approval, no account to make — the
 things that stop most Canvas tools dead at a school that locks them down. It borrows the login your
