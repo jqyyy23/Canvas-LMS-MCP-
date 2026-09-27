@@ -1,23 +1,31 @@
 # Publishes the one file a friend installs.
 #
-# Push a version tag and this builds `canvas-ubc.mcpb` on a clean checkout and
-# attaches it to a GitHub Release, so the README can point at a permanent
-# "latest release" link instead of asking anyone to build it:
+# Two ways to cut a release, both of which build `canvas-ubc.mcpb` on a clean
+# checkout and attach it to a GitHub Release:
 #
-#   git tag v0.1.0 && git push origin v0.1.0
+#   - push a version tag:   git tag v0.2.0 && git push origin v0.2.0
+#   - or, with no terminal: Actions > Release > Run workflow, and type the tag
+#     into the "tag" box. `gh release create --target` creates the tag itself,
+#     so this path needs nothing but the repo.
+#
+# Running it with the tag box empty just builds the bundle and leaves it as a
+# downloadable build artifact, which is the way to check a build without
+# publishing anything.
 #
 # Building here rather than on a laptop is also the safer default: `npm run pack`
 # stages from an allowlist and refuses to pack anything credential-shaped, but a
 # runner has no `.env` to leak in the first place.
-#
-# Run it manually (Actions > Release > Run workflow) to get a bundle as a
-# downloadable build artifact without cutting a release.
 name: Release
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, e.g. v0.2.0. Leave empty to only build the bundle.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -25,6 +33,10 @@ permissions:
 jobs:
   bundle:
     runs-on: ubuntu-latest
+    env:
+      # The tag being published, from whichever trigger fired. Empty means
+      # "build only", so every publishing step below is guarded on it.
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,13 +50,13 @@ jobs:
       # The install screen shows manifest.json's version, so a tag that disagrees
       # with it ships a bundle that misreports itself.
       - name: Check the tag matches the manifest version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.TAG != ''
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          version="${TAG#v}"
           manifest=$(node -p "require('./manifest.json').version")
           package=$(node -p "require('./package.json').version")
-          if [ "$tag" != "$manifest" ] || [ "$tag" != "$package" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match manifest.json ($manifest) / package.json ($package)."
+          if [ "$version" != "$manifest" ] || [ "$version" != "$package" ]; then
+            echo "::error::Tag $TAG does not match manifest.json ($manifest) / package.json ($package)."
             exit 1
           fi
 
@@ -58,13 +70,19 @@ jobs:
           path: canvas-ubc.mcpb
           if-no-files-found: error
 
-      - name: Attach the bundle to a release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish the release
+        if: env.TAG != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" canvas-ubc.mcpb \
-            --title "$GITHUB_REF_NAME" \
+          # --target creates the tag when it does not exist yet, and is ignored
+          # for a tag that does; --clobber covers re-running against a release
+          # that is already there.
+          gh release create "$TAG" canvas-ubc.mcpb \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
             --generate-notes \
             --latest \
-            || gh release upload "$GITHUB_REF_NAME" canvas-ubc.mcpb --clobber
+            || gh release upload "$TAG" canvas-ubc.mcpb --clobber
+          gh release view "$TAG" --json tagName,url,assets \
+            --jq '"Published \(.tagName): \(.url)\nAssets: \(.assets | map(.name) | join(", "))"'

@@ -219,9 +219,12 @@ git tag v0.2.1 && git push origin v0.2.1
 ```
 
 `.github/workflows/release.yml` builds the bundle on a clean checkout, refuses to continue if the tag
-and the two version fields disagree, and attaches `canvas-ubc.mcpb` to the release. Running it
-manually (**Actions → Release → Run workflow**) produces the same bundle as a downloadable build
-artifact without cutting a release.
+and the two version fields disagree, and attaches `canvas-ubc.mcpb` to the release.
+
+**Or publish without a terminal:** **Actions → Release → Run workflow**, and type the tag (`v0.2.1`)
+into the box. `gh release create --target` creates the tag itself, so that path needs nothing but the
+repo — useful when a local `git push --tags` is blocked. Leave the box empty and it just builds the
+bundle as a downloadable artifact, which is how to check a build without publishing anything.
 
 Building on a runner is also the safer default: `npm run pack` guards against shipping credentials,
 but a runner has no `.env` to leak in the first place.
