@@ -214,7 +214,8 @@ is a tag:
 
 ```bash
 # bump "version" in package.json AND manifest.json first — they must match the tag
-git tag v0.1.1 && git push origin v0.1.1
+npm version 0.2.1 --no-git-tag-version   # package.json + lockfile; edit manifest.json to match
+git tag v0.2.1 && git push origin v0.2.1
 ```
 
 `.github/workflows/release.yml` builds the bundle on a clean checkout, refuses to continue if the tag
