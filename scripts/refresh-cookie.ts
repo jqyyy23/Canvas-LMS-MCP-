@@ -9,8 +9,11 @@
  * often. It writes `.env` for you and verifies the cookie against Canvas
  * immediately, so you learn it worked here rather than from a failing tool call.
  *
- * The running MCP server re-reads `.env` on its next authentication failure, so
- * no restart is needed.
+ * A running MCP server re-reads `.env` on its next authentication failure, so no
+ * restart is needed. A server that already exited — which is what happens in a
+ * fresh clone, where there is no `.env` at launch — cannot, so the closing
+ * message says to reload the client's tools in that case rather than claiming
+ * the refresh is always self-applying.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -106,7 +109,13 @@ async function main(): Promise<void> {
         console.log(
             `✅ Verified — signed in as ${self.name ?? self.short_name ?? 'unknown'} (id ${idToString(self.id)})`,
         );
-        console.log('\nThe MCP server picks this up automatically. No restart needed.');
+        console.log(
+            '\nA running MCP server picks this up on its next call — no restart needed.\n' +
+                'If the Canvas tools are missing or still report an expired session, its\n' +
+                'process exited earlier and the client is holding a dead connection: reload\n' +
+                'the tools (in Claude Code, /mcp > canvas > Reconnect), then run\n' +
+                'check_canvas_auth.',
+        );
     } catch (err) {
         console.error(`\n❌ Canvas rejected it:\n${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
